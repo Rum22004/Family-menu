@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import '../models/menu_item.dart';
 
 class TelegramService {
-  static const String baseUrl = 'http://localhost:5000';
-
+  static const String baseUrl = 'https://family-menu-lvta.onrender.com';
+  
   static Future<Map<String, dynamic>> sendMenuToTelegram({
     required List<MenuItem> selectedItems,
     required String note,
