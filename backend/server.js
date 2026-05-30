@@ -7,7 +7,12 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+}));
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -38,7 +43,7 @@ app.post("/api/send-menu", async (req, res) => {
     if (!botToken || !chatId) {
       return res.status(500).json({
         success: false,
-        message: "Telegram token or chat ID is missing in .env file",
+        message: "Telegram token or chat ID is missing",
       });
     }
 
@@ -46,8 +51,7 @@ app.post("/api/send-menu", async (req, res) => {
       .map((item, index) => `${index + 1}. ${item.name}`)
       .join("\n");
 
-    const finalNote =
-      note && note.trim() !== "" ? note.trim() : "មិនមាន";
+    const finalNote = note && note.trim() !== "" ? note.trim() : "មិនមាន";
 
     const now = new Date().toLocaleString("en-US", {
       timeZone: "Asia/Phnom_Penh",
@@ -67,17 +71,10 @@ ${finalNote}
 
     const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
-    const telegramResponse = await axios.post(telegramUrl, {
+    await axios.post(telegramUrl, {
       chat_id: chatId,
       text: telegramMessage,
     });
-
-    if (!telegramResponse.data.ok) {
-      return res.status(500).json({
-        success: false,
-        message: "Telegram failed to send message",
-      });
-    }
 
     return res.status(200).json({
       success: true,
@@ -97,5 +94,5 @@ ${finalNote}
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
