@@ -17,73 +17,90 @@ app.use(
 
 app.use(express.json());
 
-function getPhnomPenhHour() {
+function getPhnomPenhTimeParts() {
   const now = new Date();
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Phnom_Penh",
     hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
   });
 
-  let hour = Number(formatter.format(now));
+  const parts = formatter.formatToParts(now);
+
+  let hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
 
   if (hour === 24) {
     hour = 0;
   }
 
-  return hour;
+  return { hour, minute };
 }
 
 function isOrderingOpen() {
-  const hour = getPhnomPenhHour();
+  const { hour, minute } = getPhnomPenhTimeParts();
 
-  // Closed from 4 PM until before 7 PM.
-  // Open before 4 PM and after 7 PM.
-  return hour < 16 || hour >= 19;
+  const totalMinutes = hour * 60 + minute;
+
+  const openStart = 1 * 60 + 30; // 1:30 AM
+  const closeStart = 1 * 60 + 40; // 1:40 AM
+  const reopenStart = 1 * 60 + 45; // 1:45 AM
+
+  // Open from 1:30 AM to before 1:40 AM
+  if (totalMinutes >= openStart && totalMinutes < closeStart) {
+    return true;
+  }
+
+  // Closed from 1:40 AM to before 1:45 AM
+  if (totalMinutes >= closeStart && totalMinutes < reopenStart) {
+    return false;
+  }
+
+  // Open again after 1:45 AM
+  if (totalMinutes >= reopenStart) {
+    return true;
+  }
+
+  // Before 1:30 AM, keep it closed
+  return false;
 }
 
 function getSessionMessage() {
-  const hour = getPhnomPenhHour();
+  const { hour, minute } = getPhnomPenhTimeParts();
 
-  if (hour >= 16 && hour < 19) {
-    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញក្រោយម៉ោង 7:00 យប់ សម្រាប់ថ្ងៃស្អែក។";
+  const totalMinutes = hour * 60 + minute;
+
+  const openStart = 1 * 60 + 30;
+  const closeStart = 1 * 60 + 40;
+  const reopenStart = 1 * 60 + 45;
+
+  if (totalMinutes < openStart) {
+    return "ការកម្មង់មិនទាន់បើកទេ។ នឹងបើកនៅម៉ោង 1:30 AM។";
   }
 
-  if (hour >= 19) {
-    return "ការកម្មង់បានបើកវិញហើយ។ អ្នកអាចកម្មង់មុខម្ហូបសម្រាប់ថ្ងៃស្អែកបាន។";
+  if (totalMinutes >= openStart && totalMinutes < closeStart) {
+    return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 1:40 AM។";
   }
 
-  return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 4:00 ល្ងាច។";
+  if (totalMinutes >= closeStart && totalMinutes < reopenStart) {
+    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញនៅម៉ោង 1:45 AM។";
+  }
+
+  return "ការកម្មង់បានបើកវិញហើយ។ អ្នកអាចកម្មង់មុខម្ហូបបាន។";
 }
 
 function getOrderTargetText() {
-  const hour = getPhnomPenhHour();
+  const { hour, minute } = getPhnomPenhTimeParts();
+  const totalMinutes = hour * 60 + minute;
+  const reopenStart = 1 * 60 + 45;
 
-  if (hour >= 19) {
+  if (totalMinutes >= reopenStart) {
     return "សម្រាប់ថ្ងៃស្អែក";
   }
 
   return "សម្រាប់ថ្ងៃនេះ";
-}
-
-async function sendTelegramMessage(text, chatId) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-  if (!botToken) {
-    throw new Error("TELEGRAM_BOT_TOKEN is missing");
-  }
-
-  if (!chatId) {
-    throw new Error("Telegram chat ID is missing");
-  }
-
-  const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-
-  await axios.post(telegramUrl, {
-    chat_id: chatId,
-    text,
-  });
 }
 
 app.get("/", (req, res) => {
