@@ -17,6 +17,14 @@ app.use(
 
 app.use(express.json());
 
+// ===============================
+// TIME RULE FOR TESTING
+// ===============================
+// 2:10 AM - 2:19 AM  = OPEN
+// 2:20 AM - 2:24 AM  = CLOSED
+// 2:25 AM and after  = OPEN AGAIN
+// Timezone: Cambodia / Phnom Penh
+
 function getPhnomPenhTimeParts() {
   const now = new Date();
 
@@ -43,26 +51,26 @@ function isOrderingOpen() {
   const { hour, minute } = getPhnomPenhTimeParts();
   const totalMinutes = hour * 60 + minute;
 
-  const openStart = 1 * 60 + 50; // 1:50 AM
-  const closeStart = 2 * 60 + 0; // 2:00 AM
-  const reopenStart = 2 * 60 + 5; // 2:05 AM
+  const openStart = 2 * 60 + 10; // 2:10 AM
+  const closeStart = 2 * 60 + 20; // 2:20 AM
+  const reopenStart = 2 * 60 + 25; // 2:25 AM
 
-  // Open from 1:50 AM until before 2:00 AM
+  // Open from 2:10 AM until before 2:20 AM
   if (totalMinutes >= openStart && totalMinutes < closeStart) {
     return true;
   }
 
-  // Closed from 2:00 AM until before 2:05 AM
+  // Closed from 2:20 AM until before 2:25 AM
   if (totalMinutes >= closeStart && totalMinutes < reopenStart) {
     return false;
   }
 
-  // Open again after 2:05 AM
+  // Open again after 2:25 AM
   if (totalMinutes >= reopenStart) {
     return true;
   }
 
-  // Before 1:50 AM
+  // Before 2:10 AM
   return false;
 }
 
@@ -70,20 +78,20 @@ function getSessionMessage() {
   const { hour, minute } = getPhnomPenhTimeParts();
   const totalMinutes = hour * 60 + minute;
 
-  const openStart = 1 * 60 + 50; // 1:50 AM
-  const closeStart = 2 * 60 + 0; // 2:00 AM
-  const reopenStart = 2 * 60 + 5; // 2:05 AM
+  const openStart = 2 * 60 + 10; // 2:10 AM
+  const closeStart = 2 * 60 + 20; // 2:20 AM
+  const reopenStart = 2 * 60 + 25; // 2:25 AM
 
   if (totalMinutes < openStart) {
-    return "ការកម្មង់មិនទាន់បើកទេ។ នឹងបើកនៅម៉ោង 1:50 AM។";
+    return "ការកម្មង់មិនទាន់បើកទេ។ នឹងបើកនៅម៉ោង 2:10 AM។";
   }
 
   if (totalMinutes >= openStart && totalMinutes < closeStart) {
-    return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 2:00 AM។";
+    return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 2:20 AM។";
   }
 
   if (totalMinutes >= closeStart && totalMinutes < reopenStart) {
-    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញនៅម៉ោង 2:05 AM។";
+    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញនៅម៉ោង 2:25 AM។";
   }
 
   return "ការកម្មង់បានបើកវិញហើយ។ អ្នកអាចកម្មង់មុខម្ហូបបាន។";
@@ -93,7 +101,7 @@ function getOrderTargetText() {
   const { hour, minute } = getPhnomPenhTimeParts();
   const totalMinutes = hour * 60 + minute;
 
-  const reopenStart = 2 * 60 + 5; // 2:05 AM
+  const reopenStart = 2 * 60 + 25; // 2:25 AM
 
   if (totalMinutes >= reopenStart) {
     return "សម្រាប់ថ្ងៃស្អែក";
@@ -101,6 +109,33 @@ function getOrderTargetText() {
 
   return "សម្រាប់ថ្ងៃនេះ";
 }
+
+// ===============================
+// TELEGRAM HELPER
+// ===============================
+
+async function sendTelegramMessage(text, chatId) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!botToken) {
+    throw new Error("TELEGRAM_BOT_TOKEN is missing");
+  }
+
+  if (!chatId) {
+    throw new Error("Telegram chat ID is missing");
+  }
+
+  const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+  await axios.post(telegramUrl, {
+    chat_id: chatId,
+    text,
+  });
+}
+
+// ===============================
+// ROUTES
+// ===============================
 
 app.get("/", (req, res) => {
   res.json({
@@ -126,10 +161,10 @@ app.get("/api/alert", async (req, res) => {
     const message = `
 🔔 Family Menu Alert
 
-ម៉ោង 3:00 ល្ងាចហើយ!
+ម៉ោង 2:10 AM ហើយ!
 
-សូមចូលជ្រើសរើសមុខម្ហូបមុនម៉ោង 4:00 ល្ងាច។
-ក្រោយម៉ោង 4:00 ល្ងាច អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
+សូមចូលជ្រើសរើសមុខម្ហូបមុនម៉ោង 2:20 AM។
+ក្រោយម៉ោង 2:20 AM អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
 
 👉 បើក Menu:
 https://family-menu-mu.vercel.app
@@ -282,6 +317,10 @@ ${finalNote}
     });
   }
 });
+
+// ===============================
+// START SERVER
+// ===============================
 
 const PORT = process.env.PORT || 5000;
 
