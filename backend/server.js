@@ -38,7 +38,8 @@ function getPhnomPenhHour() {
 function isOrderingOpen() {
   const hour = getPhnomPenhHour();
 
-  // Closed only from 4 PM to before 7 PM.
+  // Closed from 4 PM until before 7 PM.
+  // Open before 4 PM and after 7 PM.
   return hour < 16 || hour >= 19;
 }
 
@@ -66,12 +67,15 @@ function getOrderTargetText() {
   return "សម្រាប់ថ្ងៃនេះ";
 }
 
-async function sendTelegramMessage(text) {
+async function sendTelegramMessage(text, chatId) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  if (!botToken || !chatId) {
-    throw new Error("Telegram token or chat ID is missing");
+  if (!botToken) {
+    throw new Error("TELEGRAM_BOT_TOKEN is missing");
+  }
+
+  if (!chatId) {
+    throw new Error("Telegram chat ID is missing");
   }
 
   const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -98,10 +102,11 @@ app.get("/api/session", (req, res) => {
   });
 });
 
-// Test this in browser anytime:
-// https://family-menu-1tva.onrender.com/api/alert
+// ALERT ONLY TO FAMILY GROUP
 app.get("/api/alert", async (req, res) => {
   try {
+    const alertChatId = process.env.TELEGRAM_ALERT_CHAT_ID;
+
     const message = `
 🔔 Family Menu Alert
 
@@ -114,11 +119,11 @@ app.get("/api/alert", async (req, res) => {
 https://family-menu-mu.vercel.app
 `;
 
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, alertChatId);
 
     res.json({
       success: true,
-      message: "Alert sent to Telegram",
+      message: "Alert sent to family group",
     });
   } catch (error) {
     console.error("Alert error:", error.response?.data || error.message);
@@ -131,6 +136,7 @@ https://family-menu-mu.vercel.app
   }
 });
 
+// NEW ORDER / CHANGE ORDER ONLY TO YOUR PRIVATE CHAT
 app.post("/api/send-menu", async (req, res) => {
   try {
     const { selectedItems, note, action } = req.body;
@@ -152,6 +158,8 @@ app.post("/api/send-menu", async (req, res) => {
         message: "No menu selected",
       });
     }
+
+    const orderChatId = process.env.TELEGRAM_ORDER_CHAT_ID;
 
     const menuList = selectedItems
       .map((item, index) => `${index + 1}. ${item.name}`)
@@ -184,7 +192,7 @@ ${finalNote}
 ⏰ Time: ${now}
 `;
 
-    await sendTelegramMessage(telegramMessage);
+    await sendTelegramMessage(telegramMessage, orderChatId);
 
     res.status(200).json({
       success: true,
@@ -194,6 +202,8 @@ ${finalNote}
           : "New order sent to Telegram",
     });
   } catch (error) {
+    console.error("Order error:", error.response?.data || error.message);
+
     res.status(500).json({
       success: false,
       message: "Failed to send Telegram message",
@@ -202,6 +212,7 @@ ${finalNote}
   }
 });
 
+// CANCEL ORDER ONLY TO YOUR PRIVATE CHAT
 app.post("/api/cancel-order", async (req, res) => {
   try {
     if (!isOrderingOpen()) {
@@ -211,6 +222,7 @@ app.post("/api/cancel-order", async (req, res) => {
       });
     }
 
+    const orderChatId = process.env.TELEGRAM_ORDER_CHAT_ID;
     const { selectedItems, note } = req.body;
 
     const menuList =
@@ -238,13 +250,15 @@ ${finalNote}
 ⏰ Time: ${now}
 `;
 
-    await sendTelegramMessage(telegramMessage);
+    await sendTelegramMessage(telegramMessage, orderChatId);
 
     res.status(200).json({
       success: true,
       message: "Order cancelled successfully",
     });
   } catch (error) {
+    console.error("Cancel error:", error.response?.data || error.message);
+
     res.status(500).json({
       success: false,
       message: "Failed to cancel order",
