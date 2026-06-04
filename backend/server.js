@@ -103,12 +103,15 @@ app.get("/api/session", (req, res) => {
 app.get("/api/alert", async (req, res) => {
   try {
     const message = `
-🔔 ម៉ោងកម្មង់មុខម្ហូប
+🔔 Family Menu Alert
 
-ការកម្មង់មុខម្ហូបបានបើកហើយ។
-សូមជ្រើសរើស ឬផ្លាស់ប្តូរមុខម្ហូបមុនម៉ោង 4:00 ល្ងាច។
+ម៉ោង 3:00 ល្ងាចហើយ!
 
+សូមចូលជ្រើសរើសមុខម្ហូបមុនម៉ោង 4:00 ល្ងាច។
 ក្រោយម៉ោង 4:00 ល្ងាច អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
+
+👉 បើក Menu:
+https://family-menu-mu.vercel.app
 `;
 
     await sendTelegramMessage(message);
@@ -118,6 +121,8 @@ app.get("/api/alert", async (req, res) => {
       message: "Alert sent to Telegram",
     });
   } catch (error) {
+    console.error("Alert error:", error.response?.data || error.message);
+
     res.status(500).json({
       success: false,
       message: "Failed to send alert",
