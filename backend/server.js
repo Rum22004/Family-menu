@@ -18,11 +18,11 @@ app.use(
 app.use(express.json());
 
 // ===============================
-// TIME RULE FOR TESTING
+// REAL TIME RULE
 // ===============================
-// 2:10 AM - 2:19 AM  = OPEN
-// 2:20 AM - 2:24 AM  = CLOSED
-// 2:25 AM and after  = OPEN AGAIN
+// 3:00 PM - 3:59 PM  = OPEN
+// 4:00 PM - 6:59 PM  = CLOSED
+// 7:00 PM and after  = OPEN AGAIN FOR TOMORROW
 // Timezone: Cambodia / Phnom Penh
 
 function getPhnomPenhTimeParts() {
@@ -51,57 +51,58 @@ function isOrderingOpen() {
   const { hour, minute } = getPhnomPenhTimeParts();
   const totalMinutes = hour * 60 + minute;
 
-  const openStart = 2 * 60 + 10; // 2:10 AM
-  const closeStart = 2 * 60 + 20; // 2:20 AM
-  const reopenStart = 2 * 60 + 25; // 2:25 AM
+  const openStart = 15 * 60 + 0; // 3:00 PM
+  const closeStart = 16 * 60 + 0; // 4:00 PM
+  const reopenStart = 19 * 60 + 0; // 7:00 PM
 
-  // Open from 2:10 AM until before 2:20 AM
+  // Open from 3:00 PM until before 4:00 PM
   if (totalMinutes >= openStart && totalMinutes < closeStart) {
     return true;
   }
 
-  // Closed from 2:20 AM until before 2:25 AM
+  // Closed from 4:00 PM until before 7:00 PM
   if (totalMinutes >= closeStart && totalMinutes < reopenStart) {
     return false;
   }
 
-  // Open again after 2:25 AM
+  // Open again after 7:00 PM
   if (totalMinutes >= reopenStart) {
     return true;
   }
 
-  // Before 2:10 AM
-  return false;
+  // Before 3:00 PM, keep it open if you want family to order earlier.
+  // Change this to false if you only want ordering to start exactly at 3 PM.
+  return true;
 }
 
 function getSessionMessage() {
   const { hour, minute } = getPhnomPenhTimeParts();
   const totalMinutes = hour * 60 + minute;
 
-  const openStart = 2 * 60 + 10; // 2:10 AM
-  const closeStart = 2 * 60 + 20; // 2:20 AM
-  const reopenStart = 2 * 60 + 25; // 2:25 AM
+  const openStart = 15 * 60 + 0; // 3:00 PM
+  const closeStart = 16 * 60 + 0; // 4:00 PM
+  const reopenStart = 19 * 60 + 0; // 7:00 PM
 
   if (totalMinutes < openStart) {
-    return "ការកម្មង់មិនទាន់បើកទេ។ នឹងបើកនៅម៉ោង 2:10 AM។";
+    return "ការកម្មង់កំពុងបើក។ អ្នកអាចជ្រើសរើសមុខម្ហូបបាន។";
   }
 
   if (totalMinutes >= openStart && totalMinutes < closeStart) {
-    return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 2:20 AM។";
+    return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 4:00 ល្ងាច។";
   }
 
   if (totalMinutes >= closeStart && totalMinutes < reopenStart) {
-    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញនៅម៉ោង 2:25 AM។";
+    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញក្រោយម៉ោង 7:00 យប់ សម្រាប់ថ្ងៃស្អែក។";
   }
 
-  return "ការកម្មង់បានបើកវិញហើយ។ អ្នកអាចកម្មង់មុខម្ហូបបាន។";
+  return "ការកម្មង់បានបើកវិញហើយ។ អ្នកអាចកម្មង់មុខម្ហូបសម្រាប់ថ្ងៃស្អែកបាន។";
 }
 
 function getOrderTargetText() {
   const { hour, minute } = getPhnomPenhTimeParts();
   const totalMinutes = hour * 60 + minute;
 
-  const reopenStart = 2 * 60 + 25; // 2:25 AM
+  const reopenStart = 19 * 60 + 0; // 7:00 PM
 
   if (totalMinutes >= reopenStart) {
     return "សម្រាប់ថ្ងៃស្អែក";
@@ -161,10 +162,10 @@ app.get("/api/alert", async (req, res) => {
     const message = `
 🔔 Family Menu Alert
 
-ម៉ោង 2:10 AM ហើយ!
+ម៉ោង 3:00 ល្ងាចហើយ!
 
-សូមចូលជ្រើសរើសមុខម្ហូបមុនម៉ោង 2:20 AM។
-ក្រោយម៉ោង 2:20 AM អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
+សូមចូលជ្រើសរើសមុខម្ហូបមុនម៉ោង 4:00 ល្ងាច។
+ក្រោយម៉ោង 4:00 ល្ងាច អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
 
 👉 បើក Menu:
 https://family-menu-mu.vercel.app
