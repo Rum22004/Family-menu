@@ -7,13 +7,80 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-}));
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 
 app.use(express.json());
+
+function getPhnomPenhHour() {
+  const now = new Date();
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Phnom_Penh",
+    hour: "2-digit",
+    hour12: false,
+  });
+
+  let hour = Number(formatter.format(now));
+
+  if (hour === 24) {
+    hour = 0;
+  }
+
+  return hour;
+}
+
+function isOrderingOpen() {
+  const hour = getPhnomPenhHour();
+
+  // Closed only from 4 PM to before 7 PM.
+  return hour < 16 || hour >= 19;
+}
+
+function getSessionMessage() {
+  const hour = getPhnomPenhHour();
+
+  if (hour >= 16 && hour < 19) {
+    return "ការកម្មង់បានបិទហើយ។ អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។ នឹងបើកវិញក្រោយម៉ោង 7:00 យប់ សម្រាប់ថ្ងៃស្អែក។";
+  }
+
+  if (hour >= 19) {
+    return "ការកម្មង់បានបើកវិញហើយ។ អ្នកអាចកម្មង់មុខម្ហូបសម្រាប់ថ្ងៃស្អែកបាន។";
+  }
+
+  return "ការកម្មង់កំពុងបើក។ សូមកម្មង់មុនម៉ោង 4:00 ល្ងាច។";
+}
+
+function getOrderTargetText() {
+  const hour = getPhnomPenhHour();
+
+  if (hour >= 19) {
+    return "សម្រាប់ថ្ងៃស្អែក";
+  }
+
+  return "សម្រាប់ថ្ងៃនេះ";
+}
+
+async function sendTelegramMessage(text) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    throw new Error("Telegram token or chat ID is missing");
+  }
+
+  const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+  await axios.post(telegramUrl, {
+    chat_id: chatId,
+    text,
+  });
+}
 
 app.get("/", (req, res) => {
   res.json({
@@ -22,9 +89,53 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get("/api/session", (req, res) => {
+  res.json({
+    success: true,
+    isOpen: isOrderingOpen(),
+    message: getSessionMessage(),
+    orderTarget: getOrderTargetText(),
+  });
+});
+
+// Test this in browser anytime:
+// https://family-menu-1tva.onrender.com/api/alert
+app.get("/api/alert", async (req, res) => {
+  try {
+    const message = `
+🔔 ម៉ោងកម្មង់មុខម្ហូប
+
+ការកម្មង់មុខម្ហូបបានបើកហើយ។
+សូមជ្រើសរើស ឬផ្លាស់ប្តូរមុខម្ហូបមុនម៉ោង 4:00 ល្ងាច។
+
+ក្រោយម៉ោង 4:00 ល្ងាច អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
+`;
+
+    await sendTelegramMessage(message);
+
+    res.json({
+      success: true,
+      message: "Alert sent to Telegram",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to send alert",
+      error: error.response?.data || error.message,
+    });
+  }
+});
+
 app.post("/api/send-menu", async (req, res) => {
   try {
-    const { selectedItems, note } = req.body;
+    const { selectedItems, note, action } = req.body;
+
+    if (!isOrderingOpen()) {
+      return res.status(403).json({
+        success: false,
+        message: getSessionMessage(),
+      });
+    }
 
     if (
       !selectedItems ||
@@ -34,16 +145,6 @@ app.post("/api/send-menu", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "No menu selected",
-      });
-    }
-
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!botToken || !chatId) {
-      return res.status(500).json({
-        success: false,
-        message: "Telegram token or chat ID is missing",
       });
     }
 
@@ -57,8 +158,17 @@ app.post("/api/send-menu", async (req, res) => {
       timeZone: "Asia/Phnom_Penh",
     });
 
+    const orderTarget = getOrderTargetText();
+
+    const title =
+      action === "change"
+        ? "♻️ ការកម្មង់ត្រូវបានផ្លាស់ប្តូរ"
+        : "🍽️ ការកម្មង់ថ្មី";
+
     const telegramMessage = `
-🍽️ មុខម្ហូបដែលបានជ្រើស
+${title}
+
+📅 កម្មង់: ${orderTarget}
 
 📋 បញ្ជីមុខម្ហូប:
 ${menuList}
@@ -69,23 +179,70 @@ ${finalNote}
 ⏰ Time: ${now}
 `;
 
-    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await sendTelegramMessage(telegramMessage);
 
-    await axios.post(telegramUrl, {
-      chat_id: chatId,
-      text: telegramMessage,
-    });
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Sent to Telegram successfully",
+      message:
+        action === "change"
+          ? "Changed order sent to Telegram"
+          : "New order sent to Telegram",
     });
   } catch (error) {
-    console.error("Telegram error:", error.response?.data || error.message);
-
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Failed to send Telegram message",
+      error: error.response?.data || error.message,
+    });
+  }
+});
+
+app.post("/api/cancel-order", async (req, res) => {
+  try {
+    if (!isOrderingOpen()) {
+      return res.status(403).json({
+        success: false,
+        message: getSessionMessage(),
+      });
+    }
+
+    const { selectedItems, note } = req.body;
+
+    const menuList =
+      selectedItems && selectedItems.length > 0
+        ? selectedItems
+            .map((item, index) => `${index + 1}. ${item.name}`)
+            .join("\n")
+        : "មិនមាន";
+
+    const finalNote = note && note.trim() !== "" ? note.trim() : "មិនមាន";
+
+    const now = new Date().toLocaleString("en-US", {
+      timeZone: "Asia/Phnom_Penh",
+    });
+
+    const telegramMessage = `
+❌ ការកម្មង់ត្រូវបានលុប
+
+📋 មុខម្ហូបដែលបានលុប:
+${menuList}
+
+📝 កំណត់ចំណាំ:
+${finalNote}
+
+⏰ Time: ${now}
+`;
+
+    await sendTelegramMessage(telegramMessage);
+
+    res.status(200).json({
+      success: true,
+      message: "Order cancelled successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel order",
       error: error.response?.data || error.message,
     });
   }
