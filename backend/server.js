@@ -18,12 +18,12 @@ app.use(
 app.use(express.json());
 
 // ===============================
-// REAL TIME RULE
+// REAL ORDER TIME RULE
 // ===============================
-// 3:00 PM - 3:59 PM  = OPEN
-// 4:00 PM - 6:59 PM  = CLOSED
-// 7:00 PM and after  = OPEN AGAIN FOR TOMORROW
-// Timezone: Cambodia / Phnom Penh
+// 3:00 PM - 3:59 PM = OPEN
+// 4:00 PM - 6:59 PM = CLOSED
+// 7:00 PM and after = OPEN AGAIN FOR TOMORROW
+// Timezone: Asia/Phnom_Penh
 
 function getPhnomPenhTimeParts() {
   const now = new Date();
@@ -70,8 +70,8 @@ function isOrderingOpen() {
     return true;
   }
 
-  // Before 3:00 PM, keep it open if you want family to order earlier.
-  // Change this to false if you only want ordering to start exactly at 3 PM.
+  // Before 3:00 PM, still allow ordering.
+  // If you want to block before 3 PM, change this to false.
   return true;
 }
 
@@ -138,13 +138,12 @@ async function sendTelegramMessage(text, chatId) {
 // ROUTES
 // ===============================
 
+// Small response for Render wake-up cron
 app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Family menu backend is running",
-  });
+  res.status(200).type("text/plain").send("OK");
 });
 
+// Session status for frontend
 app.get("/api/session", (req, res) => {
   res.json({
     success: true,
@@ -155,6 +154,7 @@ app.get("/api/session", (req, res) => {
 });
 
 // ALERT ONLY TO FAMILY GROUP
+// cron-job.org should call this at 3:00 PM
 app.get("/api/alert", async (req, res) => {
   try {
     const alertChatId = process.env.TELEGRAM_ALERT_CHAT_ID;
@@ -173,18 +173,13 @@ https://family-menu-mu.vercel.app
 
     await sendTelegramMessage(message, alertChatId);
 
-    res.json({
-      success: true,
-      message: "Alert sent to family group",
-    });
+    // Small response so cron-job.org will not fail with "output too large"
+    res.status(200).type("text/plain").send("OK");
   } catch (error) {
     console.error("Alert error:", error.response?.data || error.message);
 
-    res.status(500).json({
-      success: false,
-      message: "Failed to send alert",
-      error: error.response?.data || error.message,
-    });
+    // Small error response for cron-job.org
+    res.status(500).type("text/plain").send("ALERT_FAILED");
   }
 });
 
