@@ -168,7 +168,7 @@ app.get("/api/alert", async (req, res) => {
 ក្រោយម៉ោង 4:00 ល្ងាច អ្នកមិនអាចកម្មង់ ផ្លាស់ប្តូរ ឬលុបការកម្មង់បានទេ។
 
 👉 បើក Menu:
-https://family-menu-m73p.onrender.com
+https://family-menu-mu.vercel.app
 `;
 
     await sendTelegramMessage(message, alertChatId);
