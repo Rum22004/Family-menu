@@ -8,12 +8,20 @@ class CartScreen extends StatefulWidget {
   final List<MenuItem> cartItems;
   final void Function(MenuItem item) onRemove;
   final VoidCallback onClearCart;
+  final bool isChangingOrder;
+
+  final void Function({
+    required List<MenuItem> items,
+    required String note,
+  }) onOrderSuccess;
 
   const CartScreen({
     super.key,
     required this.cartItems,
     required this.onRemove,
     required this.onClearCart,
+    required this.isChangingOrder,
+    required this.onOrderSuccess,
   });
 
   @override
@@ -37,13 +45,21 @@ class _CartScreenState extends State<CartScreen> {
     });
 
     try {
+      final orderedSnapshot = List<MenuItem>.from(widget.cartItems);
+      final noteSnapshot = noteController.text.trim();
+
       final result = await TelegramService.sendMenuToTelegram(
-        selectedItems: widget.cartItems,
-        note: noteController.text.trim(),
+        selectedItems: orderedSnapshot,
+        note: noteSnapshot,
+        action: widget.isChangingOrder ? 'change' : 'new',
       );
 
       if (result['success'] == true) {
-        widget.onClearCart();
+        widget.onOrderSuccess(
+          items: orderedSnapshot,
+          note: noteSnapshot,
+        );
+
         noteController.clear();
 
         if (!mounted) return;
@@ -62,9 +78,7 @@ class _CartScreenState extends State<CartScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'មិនអាចភ្ជាប់ទៅ Backend បានទេ។ សូមពិនិត្យមើល backend run ឬអត់។',
-          ),
+          content: Text('មិនអាចភ្ជាប់ទៅ Backend បានទេ។'),
         ),
       );
     } finally {
@@ -84,13 +98,15 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final buttonText = widget.isChangingOrder ? 'ផ្ញើការផ្លាស់ប្តូរ' : 'ទិញ';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 50, 18, 20),
       child: Column(
         children: [
-          const Text(
-            'YOUR CART',
-            style: TextStyle(
+          Text(
+            widget.isChangingOrder ? 'CHANGE ORDER' : 'YOUR CART',
+            style: const TextStyle(
               fontSize: 21,
               letterSpacing: 1,
               fontWeight: FontWeight.w400,
@@ -98,6 +114,30 @@ class _CartScreenState extends State<CartScreen> {
           ),
 
           const SizedBox(height: 26),
+
+          if (widget.isChangingOrder)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xfffff1f1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xffffc7c7)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.edit_note, color: Colors.red),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'អ្នកកំពុងផ្លាស់ប្តូរការកម្មង់។ ពេលផ្ញើទៅ Telegram វានឹងបង្ហាញថាជាការផ្លាស់ប្តូរ។',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           Expanded(
             child: widget.cartItems.isEmpty
@@ -130,21 +170,12 @@ class _CartScreenState extends State<CartScreen> {
                                   height: 88,
                                   color: Colors.grey.shade300,
                                   alignment: Alignment.center,
-                                  child: Text(
-                                    'Missing\n${item.imageUrl}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 9,
-                                    ),
-                                  ),
+                                  child: const Icon(Icons.restaurant),
                                 );
                               },
                             ),
                           ),
-
                           const SizedBox(width: 14),
-
                           Expanded(
                             child: Text(
                               item.name,
@@ -154,7 +185,6 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                             ),
                           ),
-
                           IconButton(
                             onPressed: () => widget.onRemove(item),
                             icon: const Icon(
@@ -205,9 +235,7 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
-
                 TextField(
                   controller: noteController,
                   maxLines: 3,
@@ -236,7 +264,7 @@ class _CartScreenState extends State<CartScreen> {
           const SizedBox(height: 14),
 
           SizedBox(
-            width: 190,
+            width: 210,
             height: 42,
             child: ElevatedButton(
               onPressed:
@@ -252,9 +280,9 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
               child: Text(
-                isLoading ? 'កំពុងផ្ញើ...' : 'ទិញ',
+                isLoading ? 'កំពុងផ្ញើ...' : buttonText,
                 style: const TextStyle(
-                  fontSize: 17,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                 ),
               ),

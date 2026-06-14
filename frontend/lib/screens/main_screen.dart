@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/menu_item.dart';
-import 'home_screen.dart';
 import 'cart_screen.dart';
+import 'home_screen.dart';
+import 'order_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -13,7 +14,13 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int selectedIndex = 0;
+
   final List<MenuItem> cartItems = [];
+  List<MenuItem> orderedItems = [];
+
+  String orderNote = '';
+  bool hasOrder = false;
+  bool isChangingOrder = false;
 
   void addToCart(MenuItem item) {
     final alreadyAdded = cartItems.any((cartItem) => cartItem.id == item.id);
@@ -42,6 +49,40 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void saveOrder({
+    required List<MenuItem> items,
+    required String note,
+  }) {
+    setState(() {
+      orderedItems = List<MenuItem>.from(items);
+      orderNote = note;
+      hasOrder = true;
+      isChangingOrder = false;
+      cartItems.clear();
+      selectedIndex = 2;
+    });
+  }
+
+  void changeOrder() {
+    setState(() {
+      cartItems.clear();
+      cartItems.addAll(orderedItems);
+      isChangingOrder = true;
+      selectedIndex = 1;
+    });
+  }
+
+  void clearOrder() {
+    setState(() {
+      orderedItems = [];
+      orderNote = '';
+      hasOrder = false;
+      isChangingOrder = false;
+      cartItems.clear();
+      selectedIndex = 0;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Widget> screens = [
@@ -49,15 +90,19 @@ class _MainScreenState extends State<MainScreen> {
         cartItems: cartItems,
         onAddToCart: addToCart,
       ),
-      HomeScreen(
-        cartItems: cartItems,
-        onAddToCart: addToCart,
-        autoFocusSearch: true,
-      ),
       CartScreen(
         cartItems: cartItems,
         onRemove: removeFromCart,
         onClearCart: clearCart,
+        isChangingOrder: isChangingOrder,
+        onOrderSuccess: saveOrder,
+      ),
+      OrderScreen(
+        orderedItems: orderedItems,
+        orderNote: orderNote,
+        hasOrder: hasOrder,
+        onChangeOrder: changeOrder,
+        onClearOrder: clearOrder,
       ),
     ];
 
@@ -93,17 +138,21 @@ class _MainScreenState extends State<MainScreen> {
                         icon: Icon(Icons.home_outlined),
                         label: 'Home',
                       ),
-                      const BottomNavigationBarItem(
-                        icon: Icon(Icons.search),
-                        label: 'Search',
-                      ),
                       BottomNavigationBarItem(
                         icon: Badge(
                           isLabelVisible: cartItems.isNotEmpty,
                           label: Text(cartItems.length.toString()),
-                          child: const Icon(Icons.shopping_cart),
+                          child: const Icon(Icons.shopping_cart_outlined),
                         ),
                         label: 'Cart',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Badge(
+                          isLabelVisible: hasOrder,
+                          label: const Text('1'),
+                          child: const Icon(Icons.receipt_long_outlined),
+                        ),
+                        label: 'Order',
                       ),
                     ],
                   ),
